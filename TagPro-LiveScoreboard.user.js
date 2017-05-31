@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TagPro LiveScoreboard
-// @version      0.5
-// @description  Live Scoreboard that plays along with TagPro NewJerseys script (but can be used as standalone)
+// @version      0.7.1
+// @description  Live Scoreboard that plays along with TagPro NewJerseys script
 // @author       zeeres
 // @include      http://tagpro-*.koalabeast.com*
 // @grant        GM_setValue
@@ -11,12 +11,14 @@
 // @require      http://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js
 // @require      http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js
 // @resource     jqUI_CSS  http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css
+// @updateURL    https://github.com/zeeres/TagPro-LiveScoreboard/raw/master/TagPro-LiveScoreboard.user.js
+// @downloadURL  https://github.com/zeeres/TagPro-LiveScoreboard/raw/master/TagPro-LiveScoreboard.user.js
 // ==/UserScript==
 
 // Add your own imgur album links here inside quotes with commas between quoted album links
 // For example: var customAlbums = ["http://imgur.com/a/0zBNw", "http://imgur.com/a/1abcD"]; (do not include comma if only 1 album)
 // Images should have titles that match team names and a single digit numerical description that matches team color (0 for either/both, 1 for red, 2 for blue)
-var Albums = ['https://imgur.com/a/hDzri'];
+var Albums = ['https://imgur.com/a/hDzri', 'https://imgur.com/a/mTiFb', 'https://imgur.com/a/JcPvD', 'https://imgur.com/a/RyADS'];
 
 // Add your own imgur image links here inside quotes with commas between quoted image links, it must links to the png file
 // For example: var customImages = ["http://i.imgur.com/17aAwABc.png", "http://i.imgur.com/abc123DEF.png"]; (do not include comma if only 1 image)
@@ -30,7 +32,7 @@ var fix_position_y = 'bot';  // can be either false, top, mid, bot, top-mid, mid
 
 var client_id = 'c638f51525edea6';  // don't steal my client-id. get your own very quickly from here: https://api.imgur.com/oauth2/addclient
 
-var default_data = {stored: true, active: true, isPrivate: false, games: 2, offsets: [[0, 0], [0, 0]], leagues: [], scoreboard_images: []};  // default data
+var default_data = {stored: true, active: true, isPrivate: false, games: 2, offsets: [[0, 0, 0, 0], [0, 0, 0, 0]], selectedhalf: 0, leagues: [], scoreboard_images: []};  // default data
 
 var debug = false;
 
@@ -54,8 +56,10 @@ class Settings {
     set(variable, value) {
         this.data[variable] = value;
         GM_setValue(this.prefix+variable, value);
-        logd('have set ' + variable + ' to ' + value);
-        logd('check ' + this.prefix + variable + ' was set to ' + GM_getValue(this.prefix+variable));
+        logd('have set ' + variable + ' to: ');
+        logd(value);
+        logd('check ' + this.prefix + variable + ' was set to:');
+        logd(GM_getValue(this.prefix+variable));
     }
     delete(variable) {
         delete this.data[variable];
@@ -106,7 +110,7 @@ function ObjectIndexOf(myArray, property, searchTerm) {  // searches for a prope
 
 function ajax_read_albums() {
     for (var a = 0; a < Albums.length; a++) {
-        var match = /([A-Za-z]+)\|([A-Za-z0-9]+)/;  // imgur description will be matched for this
+        var match = /([A-Za-z0-9_]+)\|([A-Za-z0-9]+)/;  // imgur description will be matched for this
         logd('Albums['+a+']: ' + Albums[a]);
         var id = Albums[a].match(/http[s]?:\/\/imgur\.com\/a\/(.+)[\/]?/)[1];  // [0] is the whole string, [1] only the matched group (.+);
         logd('id: ' + id);
@@ -123,8 +127,8 @@ function ajax_read_albums() {
                     {
                         var descriptor = curr.description.match(match);
                         var league_index = ObjectIndexOf(data, "league", descriptor[1]);
-                        logd('league_index:');
-                        logd(league_index);
+                        logd('descriptor[1]:');
+                        logd(descriptor[1]);
                         if (league_index === -1)  // new league
                         {
                             data.push({"league": descriptor[1], "teams": []});
@@ -135,8 +139,12 @@ function ajax_read_albums() {
                         if(team_index === -1)  // new team
                         {
                             data[league_index].teams.push({"team": curr.title, logos: {}});
-                            team_index = data.length-1;
+                            team_index = data[league_index].teams.length-1;
                         }
+                        logd('league_index:');
+                        logd(league_index);
+                        logd('team_index:');
+                        logd(team_index);
                         data[league_index].teams[team_index].logos[logo] = curr.id;
                     }
                 });
@@ -210,7 +218,7 @@ function create_html() {
         var games = $(this).prop('value'),
             offsets = settings.get('offsets');
         settings.set('games', games);
-        while (offsets.length < games) offsets.push([0, 0]);
+        while (offsets.length < games) offsets.push([0, 0, 0, 0]);
         while (games < offsets.length) offsets.pop();
         settings.set('offsets', offsets);
         settings.log_all();
@@ -231,7 +239,7 @@ function html_data() {
     $playerGroup.append('<div id="tpls_offsets_div">Offsets: <table id="tpls_offsets"></table></div>');
     logd(offsets);
     for (var i = 0; i < games; i++) {
-        $('#tpls_offsets').append('<tr><td>Game ' + parseInt(i+1) + '</td><td><input type="text" name="tpls_offset_' + i + '_0" class="form-control" style="width:40px" value="' + offsets[i][0] + '"></td><td><input type="text" name="tpls_offset_' + i + '_1" class="form-control" style="width:40px" value="' + offsets[i][1] + '"></td></tr>');
+        $('#tpls_offsets').append('<tr><td>Game ' + parseInt(i+1) + '&nbsp;</td><td>H1</td><td><input type="text" name="tpls_offset_' + i + '_0_0" class="form-control" style="width:40px" value="' + offsets[i][0] + '"></td><td><input type="text" name="tpls_offset_' + i + '_0_1" class="form-control" style="width:40px" value="' + offsets[i][1] + '"></td><td>H2</td><td><input type="text" name="tpls_offset_' + i + '_1_0" class="form-control" style="width:40px" value="' + offsets[i][2] + '"></td><td><input type="text" name="tpls_offset_' + i + '_1_1" class="form-control" style="width:40px" value="' + offsets[i][3] + '"></td></tr>');
         //$('#tpls_offsets').append('<tr><td>Game ' + i + '</td><td style="width:40px"><div class="player-group-header"><div class="team-score pull-right"><div class="offset-value js-socket-setting" name="tpls_offset_' + i + '_1">0</div><div class="offset-buttons"><svg class="up-score" data-name="tpls_offset_' + i + '_1" data-value="1" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path d="M1408 1216q0 26-19 45t-45 19h-896q-26 0-45-19t-19-45 19-45l448-448q19-19 45-19t45 19l448 448q19 19 19 45z"></path></svg><svg class="down-score" data-name="tpls_offset_' + i + '_1" data-value="-1" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path d="M1408 704q0 26-19 45l-448 448q-19 19-45 19t-45-19l-448-448q-19-19-19-45t19-45 45-19h896q26 0 45 19t19 45z"></path></svg></div><div class="clearfix"></div></div></td><td></td></tr>');
     }
     /*$(".offset-buttons svg").click(function(e) {
@@ -243,12 +251,14 @@ function html_data() {
         var offsets = settings.get('offsets'),
             value = parseInt(elem.prop('value')),
             newvalue = value+dvalue,
-            match = elem.prop('name').match(/tpls_offset_([0-9]+)_([0-9]+)/),
+            match = elem.prop('name').match(/tpls_offset_([0-9]+)_([0-9]+)_([0-9]+)/),
             game = match[1],
-            lr = match[2];
+            half = match[2],
+            lr = match[3];
+            logd(game + "|" + half + "|" + lr);
         if (newvalue >= 0) {
             elem.prop('value', newvalue);
-            offsets[game][lr] = newvalue;
+            offsets[game][parseInt(2*half)+parseInt(lr)] = newvalue;
             settings.set('offsets', offsets);
         }
     }
@@ -402,13 +412,19 @@ if(IAmIn === 'group')  // group page
                         var games = settings.get('games'),
                             offsets = settings.get('offsets');
                         for (var i = 0; i < games; i++ ){
-                            var $offset0 = $('input[name="tpls_offset_' + i + '_0"]'),
-                                $offset1 = $('input[name="tpls_offset_' + i + '_1"]'),
-                                offset0val = $('input[name="tpls_offset_' + i + '_0"]').val(),
-                                offset1val = $('input[name="tpls_offset_' + i + '_1"]').val();
-                            $offset0.val(offset1val);
-                            $offset1.val(offset0val);
-                            offsets[i] = [offset1val, offset0val];
+                            var $offset00 = $('input[name="tpls_offset_' + i + '_0_0"]'),
+                                $offset01 = $('input[name="tpls_offset_' + i + '_0_1"]'),
+                                offset00val = $('input[name="tpls_offset_' + i + '_0_0"]').val(),
+                                offset01val = $('input[name="tpls_offset_' + i + '_0_1"]').val(),
+                                $offset10 = $('input[name="tpls_offset_' + i + '_1_0"]'),
+                                $offset11 = $('input[name="tpls_offset_' + i + '_1_1"]'),
+                                offset10val = $('input[name="tpls_offset_' + i + '_1_0"]').val(),
+                                offset11val = $('input[name="tpls_offset_' + i + '_1_1"]').val();
+                            $offset00.val(offset01val);
+                            $offset01.val(offset00val);
+                            $offset10.val(offset11val);
+                            $offset11.val(offset10val);
+                            offsets[i] = [offset01val, offset00val, offset11val, offset10val];
                         }
                         settings.set('offsets', offsets);
                     }
@@ -432,9 +448,16 @@ else if (IAmIn === 'game') {
         for (var i = 0; i < leagues.length; i++) {  // add logos to the shared_leagues object
             var index1 = ObjectIndexOf(shared_leagues, 'league', leagues[i].league);
             for (var j = 0; j < leagues[i].teams.length; j++) {
-                var index2 = ObjectIndexOf(shared_leagues[i].teams, 'team', leagues[i].teams[j].team);
-                console.log('index1: ' + index1 + ', index2: ' + index2);
-                shared_leagues[index1].teams[index2].logos = leagues[i].teams[j].logos;
+                var index2 = ObjectIndexOf(shared_leagues[index1].teams, 'team', leagues[i].teams[j].team);
+                logd('team:');
+                logd(leagues[i].teams[j].team);
+                logd('index1: ' + index1 + ', index2: ' + index2);
+                logd('shared_leagues[' + index1 + ']:');
+                logd(shared_leagues[index1]);
+                logd('leagues[' + i + ']:');
+                logd(leagues[i]);
+                // if (!shared_leagues[index1].teams[index2].logos) shared_leagues[index1].teams[index2]["logos"] = {};
+                if (index1 >= 0 && index2 >= 0) shared_leagues[index1].teams[index2].logos = leagues[i].teams[j].logos;
             }
         }
 
@@ -464,7 +487,20 @@ else if (IAmIn === 'game') {
             // hideSprite('timer');
             tagpro.ui.scores = function() {};
             tagpro.ui.updateFlags = function(e, t, n) {};
-            tagpro.ui.timer = function(e, t, n, r) {};
+            tagpro.ui.timer = function(e, t, n, r) {
+                var i = tagpro.ui.sprites.timer;
+                i || (i = tagpro.ui.sprites.timer = new PIXI.Text("",{
+                    fill: "#FFFFFF",
+                    strokeThickness: 4,
+                    stroke: "#000000",
+                    font: "bold 30pt Arial"
+                }),
+                      i.alpha = 0.0,
+                      i.anchor.x = 0.5,
+                      e.addChild(tagpro.ui.sprites.timer)),
+                    i.text != r && i.setText(r),
+                    i.visible = !!tagpro.settings.ui.matchState;
+            };
             // tagpro.ui.sprites.redScore.alpha = 0;
             // tagpro.ui.sprites.blueScore.alpha = 0;
             // tagpro.ui.sprites.redFlag.alpha = 0;
@@ -506,22 +542,33 @@ else if (IAmIn === 'game') {
             // add scores
             $LiveScoreboard.append('<div id="redScore" style="position:absolute; left:245px; top:30px; width:45px; height:45px; text-align:center;"></div>');
             $LiveScoreboard.append('<div id="blueScore" style="position:absolute; left:345px; top:30px; width:45px; height:45px; text-align:center;"></div>');
-            $("#redScore").append('<div id="redScoreText" style="text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:40px">0</div>');
-            $("#blueScore").append('<div id="blueScoreText" style="text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:40px">0</div>');
-            // cumulative scores if in half 2
-            $LiveScoreboard.append('<div id="redScore2" style="position:absolute; left:284px; top:71px; width:32px; height:24px; text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:20px">' + parseInt(offsets[Math.floor(selectedhalf/2)][0] + (tagpro.score.r || 0)) + '</div>');
-            $LiveScoreboard.append('<div id="blueScore2" style="position:absolute; left:320px; top:71px; width:32px; height:24px; text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:20px">' + parseInt(offsets[Math.floor(selectedhalf/2)][1] + (tagpro.score.b || 0)) + '</div>');
+            rhalfindex = (selectedhalf % 2 === 0?0:2);
+            bhalfindex = (selectedhalf % 2 === 0?1:3);
+            $("#redScore").append('<div id="redScoreText" style="text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:40px">' + offsets[Math.floor(selectedhalf/2)][rhalfindex] + '</div>');
+            $("#blueScore").append('<div id="blueScoreText" style="text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:40px">' + offsets[Math.floor(selectedhalf/2)][bhalfindex] + '</div>');
+            // add cumulative scores if in half 2
+            logd('offset:');
+            logd(offsets[Math.floor(selectedhalf/2)]);
+            $LiveScoreboard.append('<div id="redScore2" style="position:absolute; left:284px; top:71px; width:32px; height:24px; text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:20px">' + parseInt(offsets[Math.floor(selectedhalf/2)][0] + offsets[Math.floor(selectedhalf/2)][2] + (tagpro.score.r || 0)) + '</div>');
+            $LiveScoreboard.append('<div id="blueScore2" style="position:absolute; left:320px; top:71px; width:32px; height:24px; text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:20px">' + parseInt(offsets[Math.floor(selectedhalf/2)][1] + offsets[Math.floor(selectedhalf/2)][3] + (tagpro.score.b || 0)) + '</div>');
             // $("#redScore").append('<div id="redScore2Text" style="text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:20px">' + parseInt(offsets[Math.floor(selectedhalf/2)] + (tagpro.score.r || 0)) + '</div>');
             // $("#blueScore").append('<div id="blueScore2Text" style="text-align:center; font-weight:bold; color:white; font-family:\'Sans\'; font-size:20px">' + parseInt(offsets[Math.floor(selectedhalf/2)] + (tagpro.score.b || 0)) + '</div>');
             tagpro.socket.on('score', function(score) {
                 var selectedhalf = settings.get('selectedhalf'),
-                    offsets = settings.get('offsets');
-                $("#redScoreText").html(score.r);
-                $("#blueScoreText").html(score.b);
-                var rs2 = parseInt(offsets[Math.floor(selectedhalf/2)][0])+parseInt(score.r),
-                    bs2 = parseInt(offsets[Math.floor(selectedhalf/2)][1])+parseInt(score.b);
+                    offsets = settings.get('offsets'),
+                    rhalfindex = (selectedhalf % 2 === 0?0:2),
+                    bhalfindex = (selectedhalf % 2 === 0?1:3),
+                    rs = parseInt(offsets[Math.floor(selectedhalf/2)][rhalfindex]) + parseInt(score.r),
+                    bs = parseInt(offsets[Math.floor(selectedhalf/2)][bhalfindex]) + parseInt(score.b),
+                    rs2 = parseInt(parseInt(offsets[Math.floor(selectedhalf/2)][0]) + (selectedhalf % 2 === 1?parseInt(offsets[Math.floor(selectedhalf/2)][2]):0) + parseInt(score.r)),
+                    bs2 = parseInt(parseInt(offsets[Math.floor(selectedhalf/2)][1]) + (selectedhalf % 2 === 1?parseInt(offsets[Math.floor(selectedhalf/2)][3]):0) + parseInt(score.b));
+                $("#redScoreText").html(rs);
+                $("#blueScoreText").html(bs);
                 $("#redScore2").html(rs2);
                 $("#blueScore2").html(bs2);
+                /*offsets[Math.floor(selectedhalf/2)][rhalfindex] = rs;
+                offsets[Math.floor(selectedhalf/2)][bhalfindex] = bs;*/
+                //settings.set('offsets', offsets);
             });
             if (selectedhalf%2===0) {
                 $("#redScore2").hide();
@@ -530,10 +577,24 @@ else if (IAmIn === 'game') {
 
             var d, img;
             if(lastRedTeam) d = lastRedTeam.split('.');
-            if (d !== undefined) img = shared_leagues[d[0]].teams[d[1]].logos.L440;  // if lastRedTeam is not of the format "league.team.jersey"
+            if (d !== undefined) {
+                try {
+                    img = shared_leagues[d[0]].teams[d[1]].logos.L440;  // if lastRedTeam is not of the format "league.team.jersey"
+                } catch(e) {
+                    logd('L440 Logo for red team not found!');
+                    img = 'SViDkXM';  // blank image
+                }
+            }
             var db, imgb;
             if(lastBlueTeam) db = lastBlueTeam.split('.');
-            if (db !== undefined) imgb = shared_leagues[db[0]].teams[db[1]].logos.L440;
+            if (db !== undefined) {
+                try {
+                    imgb = shared_leagues[db[0]].teams[db[1]].logos.L440;
+                } catch(e) {
+                    logd('L440 Logo for blue team not found!');
+                    imgb = 'SViDkXM';
+                }
+            }
             // $LiveScoreboard.append('<div id="redlogo" style="position:absolute; left:138px; top:15px; width:80px; height:80px; text-align:center; background-size: 100% 100%; background-image: url(http://i.imgur.com/' + img + '.png);"></div>');
             // $LiveScoreboard.append('<div id="bluelogo" style="position:absolute; left:418px; top:15px; width:80px; height:80px; text-align:center; background-size: 100% 100%; background-image: url(http://i.imgur.com/' + imgb + '.png);"></div>');
             // $('<div id="redlogo" style="position:absolute; left:138px; top:15px; width:80px; height:80px; text-align:center; background-size: 100% 100%; background-image: url(http://i.imgur.com/' + img + '.png); clip-path: url(#clipRed);"><svg width="0" height="0"><defs><clipPath id="clipRed"><circle cx="0" cy="160" r="300"/></clipPath></defs></svg></div>').insertAfter('#BG');
@@ -547,15 +608,20 @@ else if (IAmIn === 'game') {
 
              tagpro.socket.on('end', function(data) {
                  var selectedhalf = parseInt(settings.get('selectedhalf')),
-                     offsets = settings.get('offsets');
-                 logd('new half: ' + selectedhalf+1);
+                     offsets = settings.get('offsets'),
+                     ofs = offsets[Math.floor(selectedhalf/2)];
+                 logd('endoffsets:');
+                 logd(offsets);
+                 logd('ofs:');
+                 logd(ofs);
+                 logd('new half: ' + parseInt(selectedhalf+1));
                  logd('selectedhalf%2===' + selectedhalf%2);
                  if(selectedhalf%2===0) {
-                     offsets[selectedhalf-1] = [tagpro.score.r, tagpro.score.b];
+                     offsets[selectedhalf/2] = [parseInt(ofs[0]+parseInt(tagpro.score.r)), parseInt(ofs[1] + parseInt(tagpro.score.b)), ofs[2], ofs[3]];
                  } else {
-                     offsets[selectedhalf-2] = [parseInt(offsets[selectedhalf-2][0])+parseInt(tagpro.score.r), parseInt(offsets[selectedhalf-2][1])+parseInt(tagpro.score.b)];
+                     offsets[Math.floor(selectedhalf/2)] = [ofs[0], ofs[1], parseInt(ofs[2]+parseInt(tagpro.score.r)), parseInt(ofs[3]+parseInt(tagpro.score.b))];
                  }
-                 settings.set('selectedhalf', selectedhalf+1);
+                 settings.set('selectedhalf', parseInt(selectedhalf+1));
                  settings.set('offsets', offsets);
              });
 
