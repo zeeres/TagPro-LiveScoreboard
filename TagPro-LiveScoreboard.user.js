@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         TagPro LiveScoreboard
-// @version      0.7.1
-// @description  Live Scoreboard that plays along with TagPro NewJerseys script
+// @name         TagPro LiveScoreboard dev2
+// @version      0.7.2
+// @description  Live Scoreboard that plays along with TagPro NewJerseys script (but can be used as standalone)
 // @author       zeeres
 // @include      http://tagpro-*.koalabeast.com*
 // @grant        GM_setValue
@@ -247,10 +247,10 @@ function html_data() {
             i = parseInt($(this).data("value"), 10);
         console.log(r, i);
     });*/
-    function change_offset(elem, dvalue) {
+    function change_offset(elem, dvalue = 0) {  // changes the offset by dvalue
         var offsets = settings.get('offsets'),
             value = parseInt(elem.prop('value')),
-            newvalue = value+dvalue,
+            newvalue = (dvalue!==0)?value+dvalue:value,
             match = elem.prop('name').match(/tpls_offset_([0-9]+)_([0-9]+)_([0-9]+)/),
             game = match[1],
             half = match[2],
@@ -273,6 +273,10 @@ function html_data() {
         event.preventDefault();  // disables scrolling temporarily
         if (event.originalEvent.wheelDelta > 0 || event.originalEvent.detail < 0) change_offset($(this), +1);
         else change_offset($(this), -1);
+    });
+
+    $('#tpls_offsets input').change(function () {
+        change_offset($(this));
     });
 
     $('#tpls_half').remove();
