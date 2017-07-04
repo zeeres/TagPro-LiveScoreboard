@@ -1,6 +1,6 @@
 // ==UserScript==
-// @name         TagPro LiveScoreboard dev2
-// @version      0.7.2
+// @name         TagPro LiveScoreboard
+// @version      0.7.3
 // @description  Live Scoreboard that plays along with TagPro NewJerseys script (but can be used as standalone)
 // @author       zeeres
 // @include      http://tagpro-*.koalabeast.com*
