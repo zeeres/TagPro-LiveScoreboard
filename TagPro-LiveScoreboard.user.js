@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TagPro LiveScoreboard
-// @version      0.7.3
+// @version      0.7.4
 // @description  Live Scoreboard that plays along with TagPro NewJerseys script (but can be used as standalone)
 // @author       zeeres
 // @include      http://tagpro-*.koalabeast.com*
@@ -18,7 +18,7 @@
 // Add your own imgur album links here inside quotes with commas between quoted album links
 // For example: var customAlbums = ["http://imgur.com/a/0zBNw", "http://imgur.com/a/1abcD"]; (do not include comma if only 1 album)
 // Images should have titles that match team names and a single digit numerical description that matches team color (0 for either/both, 1 for red, 2 for blue)
-var Albums = ['https://imgur.com/a/hDzri', 'https://imgur.com/a/mTiFb', 'https://imgur.com/a/JcPvD', 'https://imgur.com/a/RyADS'];
+var Albums = ['https://imgur.com/a/hDzri', 'https://imgur.com/a/mTiFb', 'https://imgur.com/a/JcPvD', 'https://imgur.com/a/RyADS', 'https://imgur.com/a/pHdyx'];
 
 // Add your own imgur image links here inside quotes with commas between quoted image links, it must links to the png file
 // For example: var customImages = ["http://i.imgur.com/17aAwABc.png", "http://i.imgur.com/abc123DEF.png"]; (do not include comma if only 1 image)
